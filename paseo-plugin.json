@@ -1,0 +1,9 @@
+{
+  "id": "deskmate",
+  "name": "Deskmate",
+  "description": "Personal task board and reminders for registered Paseo agent sessions. Observes only; never prompts agents.",
+  "media": [],
+  "requirements": {
+    "paseo": ">=0.11.1"
+  }
+}
