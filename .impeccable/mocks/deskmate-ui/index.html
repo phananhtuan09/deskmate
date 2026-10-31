@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deskmate · UI directions</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+.list{display:grid;grid-template-columns:repeat(2,minmax(0,560px));gap:20px;padding:0 40px 48px}
+.opt{display:block;border:1px solid #333;border-radius:10px;padding:18px 20px;color:inherit;text-decoration:none;background:#141416}
+.opt:hover{border-color:#888}
+.opt h2{margin:0 0 6px;font-size:17px}
+.opt p{margin:0 0 6px;opacity:.8;max-width:60ch}
+.opt .risk{font-size:13px;opacity:.6}
+.tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.55}
+</style>
+</head>
+<body>
+<div class="mock-bar"><div>
+  <h1>Deskmate · UI directions</h1>
+  <p>Four complete directions for the board plus Need attention, each on desktop and mobile with a dark/light switch. All use only Paseo theme color tokens, so identity comes from layout, type, and state language. Open one, drag a task, dismiss a reminder.</p>
+  <p class="mock-note">Projects screen is not mocked; it will inherit the chosen direction. All data is synthetic.</p>
+</div></div>
+<div class="list">
+  <a class="opt" href="a-front-desk.html"><span class="tag">Assigned direction</span><h2>A · Front desk</h2>
+    <p>Sessions are numbered pigeonholes; a slip sticks out when one needs you. Tasks are lines in a ruled ledger. Overdue gets a rubber stamp.</p>
+    <p class="risk">Risk: the rack takes vertical space even when nothing needs you.</p></a>
+  <a class="opt" href="b-strip-bay.html"><span class="tag">Impeccable’s pick</span><h2>B · Strip bay</h2>
+    <p>Air-traffic-control flight strips in bays. A session that needs you is cocked out of the rack; the colored front box carries time and state.</p>
+    <p class="risk">Risk: densest of the four; on narrow bays titles wrap and project names truncate.</p></a>
+  <a class="opt" href="c-line-rail.html"><span class="tag">Alternate</span><h2>C · Line rail</h2>
+    <p>An instrument plate around one off-centre rail. State is the shape of a hairline (doubled, solid, dashed, struck), one type size throughout.</p>
+    <p class="risk">Risk: the line language must be learned (a legend ships with it); columns get narrow on desktop.</p></a>
+  <a class="opt" href="d-standard.html"><span class="tag">Standard</span><h2>D · Standard board</h2>
+    <p>Linear / Trello-style kanban with rounded cards, status pills, and a Needs attention strip on top.</p>
+    <p class="risk">Risk: looks like every other kanban; least of the “own identity” you asked for.</p></a>
+</div>
+</body>
+</html>

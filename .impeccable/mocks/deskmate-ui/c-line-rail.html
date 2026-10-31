@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deskmate · C · Line rail</title>
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+<div class="mock-bar">
+  <div>
+    <h1>C · Line rail</h1>
+    <p>An instrument plate: everything hangs off one off-centre rail, and state is drawn as the shape of a hairline rather than as badges. Doubled means it outranks everything (permission, overdue), solid means it wants you, dashed means it is still running or waiting on someone else, struck means closed. One type size throughout; hierarchy is weight and ink only.</p>
+    <p class="mock-note">Synthetic data · colors are an approximation of Paseo theme tokens · <a href="index.html">all options</a></p>
+  </div>
+  <div class="mock-tools"><button data-theme-btn="dark">Dark</button><button data-theme-btn="light">Light</button></div>
+</div>
+<div class="mock-stage">
+  <div><p class="frame-label">Desktop · 1280</p><div class="frame frame-desktop" data-frame="desktop"></div></div>
+  <div><p class="frame-label">Mobile · 390</p><div class="frame frame-mobile" data-frame="mobile"></div></div>
+</div>
+<script src="shared.js"></script>
+<script>
+const toneVar = (tone) => tone === "muted" ? "var(--foregroundMuted)" : tone === "accent" ? "var(--accent)" : `var(--status${tone[0].toUpperCase()}${tone.slice(1)})`;
+
+// Line form encodes state: doubled | solid | dashed | half | struck.
+function sessionForm(s) {
+  if (s.dismissed) return "half";
+  if (s.status === "permission") return "doubled";
+  if (s.status === "running") return "dashed";
+  return "solid";
+}
+function taskForm(t) {
+  if (t.status === "Closed") return "struck";
+  if (isOverdue(t)) return "doubled";
+  if (t.status === "Pending") return "dashed";
+  if (t.status === "Done") return "half";
+  return "solid";
+}
+const taskTone = (t) => t.status === "Closed" ? "var(--foregroundMuted)" : isOverdue(t) ? "var(--statusDanger)" : t.status === "Done" ? "var(--statusSuccess)" : t.status === "Pending" ? "var(--foregroundMuted)" : "var(--foreground)";
+
+function sessionRow(s) {
+  const r = REASONS[s.status];
+  const on = needsYou(s);
+  const linked = STATE.tasks.find((t) => t.sessions.includes(s.id) && t.status !== "Closed");
+  return `<li class="c-sess ${on ? "is-on" : ""}" style="--tone:${on ? toneVar(r.tone) : "var(--foregroundMuted)"}">
+    <div class="c-sess-text">
+      <div><span class="c-strong">${esc(s.label)}</span> <span class="c-dim">${sinceLabel(s.since)}</span></div>
+      <div class="c-tone">${s.dismissed ? "Dismissed" : r.long}</div>
+      ${on ? `<div class="c-quote">${esc(s.detail)}</div>` : ""}
+      <div class="c-dim">${s.provider} · ${s.workspace}${linked && on ? ` · ${esc(linked.title)}` : ""}</div>
+      ${on ? `<button class="c-act" data-dismiss="${s.id}">Dismiss</button>` : ""}
+    </div>
+    <span class="c-tick" data-form="${sessionForm(s)}"></span>
+  </li>`;
+}
+
+function taskRow(t) {
+  const late = isOverdue(t);
+  const flags = t.sessions.map(session).filter(needsYou);
+  return `<li class="c-task" data-task="${t.id}" style="--tone:${taskTone(t)}">
+    <span class="c-mark" data-form="${taskForm(t)}"></span>
+    <div class="c-task-text">
+      <div class="c-tt ${t.status === "Closed" ? "is-closed" : ""}">${esc(t.title)}</div>
+      <div class="c-dim">${t.project ? esc(t.project) + " · " : ""}<span class="${late ? "c-late" : ""}">${dueLabel(t)}${late ? ` · ${daysLate(t)}d over` : ""}</span></div>
+      ${flags.map((s) => `<div class="c-flag" style="--tone:${toneVar(REASONS[s.status].tone)}"><span class="c-mini" data-form="${sessionForm(s)}"></span>${esc(s.label)} · ${REASONS[s.status].short}</div>`).join("")}
+    </div>
+  </li>`;
+}
+
+function column(col) {
+  const items = tasksIn(col);
+  return `<section class="c-col" data-col="${col}">
+    <header class="c-label">${col} <span class="c-dim">${items.length}</span>
+      ${col === "Closed" && items.length ? `<button class="c-act c-push" data-clear-closed>Clear</button>` : ""}
+      ${col === "Todo" ? `<button class="c-act c-push">${icon("plus", 13)}New</button>` : ""}</header>
+    <ol class="c-list">${items.map(taskRow).join("") || `<li class="c-dim c-none">None</li>`}</ol>
+  </section>`;
+}
+
+function legend() {
+  return `<div class="c-legend">
+    ${[["doubled", "outranks"], ["solid", "wants you"], ["dashed", "waiting"], ["half", "settled"], ["struck", "closed"]].map(([f, l]) => `<span><span class="c-mini" data-form="${f}"></span>${l}</span>`).join("")}
+  </div>`;
+}
+
+function render(compact) {
+  const n = attentionSessions().length, late = overdueTasks().length;
+  const sessions = [...STATE.sessions].sort((a, b) => needsYou(b) - needsYou(a));
+  const left = `<section class="c-left">
+      <header class="c-label c-label-r">Needs you <span class="c-dim">${n}</span></header>
+      <ol class="c-sessions">${sessions.map(sessionRow).join("")}</ol>
+      <label class="c-reg"><span class="c-label">Register</span><input placeholder="paste agent id"></label>
+    </section>`;
+  const head = `<header class="c-head"><span class="c-strong">Deskmate</span><span class="c-dim">Sat 31 Oct</span><span class="c-dim">${late} overdue · ${n} waiting</span>${compact ? "" : `<nav class="c-nav"><a aria-current="page">Board</a><a>Projects</a></nav>`}</header>`;
+  if (!compact) return `<div class="c">${head}<div class="c-plate">${left}<div class="c-rail"></div><div class="c-board">${COLUMNS.map(column).join("")}</div></div>${legend()}</div>`;
+  const tab = COLUMNS.includes(window.MOBILE_TAB) ? window.MOBILE_TAB : "attention";
+  return `<div class="c c-compact">${head}
+    <div class="c-tabs">${["attention", ...COLUMNS].map((c) => `<button data-tab="${c}" aria-selected="${c === tab}">${c === "attention" ? "Needs you" : c}</button>`).join("")}</div>
+    <div class="c-plate">${tab === "attention" ? left : column(tab)}</div>${legend()}</div>`;
+}
+
+boot(render, `
+.c{font-size:13px;line-height:1.5;padding:20px 28px 16px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+.c-strong{font-weight:650}
+.c-dim{color:var(--foregroundMuted)}
+.c-label{font-size:13px;font-weight:650;letter-spacing:.12em;white-space:nowrap;text-transform:uppercase;display:flex;gap:8px;align-items:center}
+.c-label .c-dim{letter-spacing:0}
+.c-head{display:flex;gap:18px;align-items:baseline}
+.c-nav{margin-left:auto;display:flex;gap:16px}
+.c-nav a{color:var(--foregroundMuted);cursor:pointer}
+.c-nav a[aria-current]{color:var(--foreground);font-weight:650;text-decoration:underline;text-underline-offset:6px;text-decoration-thickness:1px}
+.c-plate{flex:1;min-height:0;display:grid;grid-template-columns:268px 1px 1fr;gap:0;background:var(--surface1);border:1px solid var(--border)}
+.c-rail{background:var(--foregroundMuted)}
+.c-left{padding:16px 0 16px 18px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+.c-label-r{justify-content:flex-end;padding-right:18px}
+.c-sessions{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:18px}
+.c-sess{display:grid;grid-template-columns:1fr 46px;align-items:start;text-align:right}
+.c-sess-text{display:flex;flex-direction:column;gap:1px;align-items:flex-end}
+.c-tone{color:var(--tone);font-weight:650}
+.c-quote{max-width:28ch;margin:4px 0}
+.c-tick{margin-top:9px;height:5px;position:relative}
+[data-form]{--w:1px}
+.c-tick::before,.c-tick::after,.c-mini::before,.c-mini::after,.c-mark::before,.c-mark::after{content:"";position:absolute;background:var(--tone)}
+.c-tick::before{left:6px;right:0;top:0;height:1px}
+.c-tick[data-form="doubled"]::after{left:6px;right:0;top:4px;height:1px}
+.c-tick[data-form="dashed"]::before{background:repeating-linear-gradient(to right,var(--tone) 0 4px,transparent 4px 7px)}
+.c-tick[data-form="half"]::before{left:26px}
+.c-sess.is-on .c-tick::before{animation:c-emit 2.6s cubic-bezier(.16,1,.3,1) infinite}
+@keyframes c-emit{0%,70%,100%{opacity:1}35%{opacity:.35}}
+.c-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));overflow:auto}
+.c-col{padding:16px 12px;border-right:1px solid var(--border);min-height:100%;box-sizing:border-box;transition:background .15s}
+.c-col:last-child{border-right:0}
+.c-col.is-over{background:var(--surface2)}
+.c-push{margin-left:auto}
+.c-list{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:14px}
+.c-task{display:grid;grid-template-columns:14px 1fr;gap:8px;cursor:grab;padding:2px 0}
+.c-task.is-dragging{opacity:.35}
+.c-task:hover .c-tt{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.c-mark{position:relative;height:38px;margin-top:3px}
+.c-mark::before{left:3px;top:0;bottom:0;width:1px}
+.c-mark[data-form="doubled"]::after{left:7px;top:0;bottom:0;width:1px}
+.c-mark[data-form="dashed"]::before{background:repeating-linear-gradient(to bottom,var(--tone) 0 4px,transparent 4px 7px)}
+.c-mark[data-form="half"]::before{top:50%}
+.c-mark[data-form="struck"]::after{left:0;width:10px;top:50%;height:1px}
+.c-tt{font-weight:600}
+.c-tt.is-closed{font-weight:400;color:var(--foregroundMuted);text-decoration:line-through}
+.c-late{color:var(--statusDanger);font-weight:650}
+.c-flag{color:var(--tone);font-weight:650;display:flex;align-items:center;gap:6px;margin-top:3px}
+.c-mini{position:relative;display:inline-block;width:16px;height:5px;flex:none}
+.c-mini::before{left:0;right:0;top:0;height:1px}
+.c-mini[data-form="doubled"]::after{left:0;right:0;top:4px;height:1px}
+.c-mini[data-form="dashed"]::before{background:repeating-linear-gradient(to right,var(--tone) 0 3px,transparent 3px 6px)}
+.c-mini[data-form="half"]::before{right:8px}
+.c-mini[data-form="struck"]::before{top:2px}.c-mini[data-form="struck"]::after{left:6px;width:1px;top:-2px;height:9px;transform:rotate(30deg)}
+.c-act{font:inherit;font-weight:650;border:0;background:none;color:var(--foregroundMuted);padding:0;cursor:pointer;display:inline-flex;gap:4px;align-items:center;letter-spacing:0;text-transform:none;margin-top:4px}
+.c-act:hover{color:var(--foreground)}
+.c-reg{display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-right:18px;margin-top:auto}
+.c-reg input{font:inherit;width:200px;text-align:right;background:none;border:0;border-bottom:1px solid var(--foregroundMuted);color:var(--foreground);padding:4px 0;outline:none}
+.c-reg input:focus{border-bottom-color:var(--accent)}
+.c-legend{display:flex;gap:18px;color:var(--foregroundMuted);flex-wrap:wrap;--tone:var(--foregroundMuted)}
+.c-legend span{display:inline-flex;gap:7px;align-items:center}
+.c-none{padding:4px 0}
+.c-compact{padding:16px 16px 14px}
+.c-compact .c-head{flex-wrap:wrap;gap:4px 12px}
+.c-compact .c-plate{grid-template-columns:1fr;overflow:auto;border-left:0;border-right:0;margin:0 -16px;background:var(--surface1)}
+.c-compact .c-left{padding:16px 16px 16px 0}
+.c-compact .c-col{border-right:0}
+.c-tabs{display:flex;gap:16px;overflow-x:auto;margin:0 -16px;padding:0 16px}
+.c-tabs button{font:inherit;font-weight:650;letter-spacing:.12em;text-transform:uppercase;border:0;background:none;color:var(--foregroundMuted);padding:6px 0;white-space:nowrap;cursor:pointer;border-bottom:1px solid transparent}
+.c-tabs button[aria-selected="true"]{color:var(--foreground);border-bottom-color:var(--foreground)}
+button:focus-visible,input:focus-visible{outline:1px solid var(--accent);outline-offset:3px}
+::selection{background:var(--accent);color:var(--accentForeground)}
+`);
+</script>
+</body>
+</html>

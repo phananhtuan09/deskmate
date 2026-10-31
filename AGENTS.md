@@ -12,8 +12,10 @@ It observes; it never dispatches, prompts, or steers agents.
 
 ## Code layout
 
-- `core/` is host-independent: it MUST NOT import `@getpaseo/*` or any other host SDK.
-- `index.client.tsx`, `index.server.ts`, `client/`, `server/`, and `shared/` are the Paseo adapter.
+- `shared/core/` is the host-independent core.
+- It MUST NOT import `@getpaseo/*` or any other host SDK.
+- Paseo only bundles `client/`, `server/`, and `shared/`, so the core lives under `shared/`.
+- `index.client.tsx`, `index.server.ts`, `client/`, `server/`, and the rest of `shared/` are the Paseo adapter.
 - Tests live in `test/` and run with `npm test`; type checking runs with `npm run typecheck`.
 
 ## Conventions

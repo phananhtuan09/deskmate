@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deskmate · B · Strip bay</title>
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+<div class="mock-bar">
+  <div>
+    <h1>B · Strip bay</h1>
+    <p>Borrowed from air-traffic control: every task and session is a progress strip racked in a bay. A session that needs you is cocked out of its rack, the way a controller marks the strip that wants action. The colored box at the front of a strip carries time and state.</p>
+    <p class="mock-note">Synthetic data · colors are an approximation of Paseo theme tokens · <a href="index.html">all options</a></p>
+  </div>
+  <div class="mock-tools"><button data-theme-btn="dark">Dark</button><button data-theme-btn="light">Light</button></div>
+</div>
+<div class="mock-stage">
+  <div><p class="frame-label">Desktop · 1280</p><div class="frame frame-desktop" data-frame="desktop"></div></div>
+  <div><p class="frame-label">Mobile · 390</p><div class="frame frame-mobile" data-frame="mobile"></div></div>
+</div>
+<script src="shared.js"></script>
+<script>
+const toneVar = (tone) => tone === "muted" ? "var(--surface2)" : tone === "accent" ? "var(--accent)" : `var(--status${tone[0].toUpperCase()}${tone.slice(1)})`;
+const toneInk = (tone) => tone === "muted" ? "var(--foregroundMuted)" : tone === "accent" ? "var(--accentForeground)" : "var(--surface0)";
+
+function sessionStrip(s) {
+  const r = REASONS[s.status];
+  const on = needsYou(s);
+  const linked = STATE.tasks.find((t) => t.sessions.includes(s.id) && t.status !== "Closed");
+  return `<article class="b-strip b-sess ${on ? "is-cocked" : "is-flush"}">
+    <div class="b-box" style="background:${on ? toneVar(r.tone) : "var(--surface2)"};color:${on ? toneInk(r.tone) : "var(--foregroundMuted)"}">
+      ${icon(r.icon, 14)}<span class="b-mono">${sinceLabel(s.since)}</span></div>
+    <div class="b-body">
+      <div class="b-row"><span class="b-call">${esc(s.label)}</span><span class="b-mono b-dim">${s.id.slice(3)}</span></div>
+      <div class="b-reason">${on ? r.long : s.dismissed ? "Dismissed" : r.long}</div>
+      ${on ? `<p class="b-detail">${esc(s.detail)}</p>` : ""}
+      <div class="b-row b-foot"><span class="b-dim">${s.provider} · ${s.workspace}</span>${on ? `<button class="b-link" data-dismiss="${s.id}">Dismiss</button>` : ""}</div>
+      ${on && linked ? `<div class="b-task">${icon("link", 12)}${esc(linked.title)}</div>` : ""}
+    </div>
+  </article>`;
+}
+
+function taskStrip(t) {
+  const late = isOverdue(t);
+  const flags = t.sessions.map(session).filter(needsYou);
+  return `<article class="b-strip b-taskstrip ${t.status === "Closed" ? "is-closed" : ""}" data-task="${t.id}">
+    <div class="b-top">
+      <span class="b-due ${late ? "is-late" : ""}">${dueShort(t).toUpperCase()}${late ? ` +${daysLate(t)}d` : ""}</span>
+      <span class="b-route">${t.project ? esc(t.project) : "—"}</span>
+    </div>
+    <div class="b-title">${esc(t.title)}</div>
+    ${flags.length ? `<div class="b-flags">${flags.map((s) => `<span class="b-flag" style="background:${toneVar(REASONS[s.status].tone)};color:${toneInk(REASONS[s.status].tone)}">${icon(REASONS[s.status].icon, 11)}${esc(s.label)}</span>`).join("")}</div>` : ""}
+  </article>`;
+}
+
+function bay(col, compact) {
+  const items = tasksIn(col);
+  return `<section class="b-bay" data-col="${col}">
+    <header class="b-plate"><span>${col}</span><span class="b-mono">${String(items.length).padStart(2, "0")}</span>
+      ${col === "Closed" && items.length ? `<button class="b-link b-push" data-clear-closed>${icon("trash", 12)}Clear</button>` : ""}
+      ${col === "Todo" ? `<button class="b-link b-push" aria-label="New task">${icon("plus", 14)}</button>` : ""}</header>
+    <div class="b-rack">${items.map(taskStrip).join("") || `<div class="b-slot">Empty bay</div>`}</div>
+  </section>`;
+}
+
+function attentionBay() {
+  const sorted = [...STATE.sessions].sort((a, b) => needsYou(b) - needsYou(a));
+  const n = attentionSessions().length;
+  return `<section class="b-bay b-bay-att">
+    <header class="b-plate"><span>Needs you</span><span class="b-mono">${String(n).padStart(2, "0")}</span></header>
+    <div class="b-rack">${sorted.map(sessionStrip).join("")}
+      <label class="b-reg">${icon("plus", 13)}<input placeholder="Paste agent id to register"></label></div>
+  </section>`;
+}
+
+function render(compact) {
+  const late = overdueTasks().length;
+  const header = `<header class="b-head">
+    <h1>Deskmate</h1>
+    <span class="b-clock b-mono">SAT 31 OCT · 14:20</span>
+    <span class="b-chip ${late ? "is-late" : ""}">${late} overdue</span>
+    ${compact ? "" : `<nav class="b-nav"><a aria-current="page">Board</a><a>Projects</a></nav>`}
+  </header>`;
+  if (!compact) return `<div class="b">${header}<div class="b-floor">${attentionBay()}<div class="b-board">${COLUMNS.map((c) => bay(c)).join("")}</div></div></div>`;
+  const tab = window.MOBILE_TAB;
+  const tabs = ["attention", ...COLUMNS];
+  return `<div class="b b-compact">${header}
+    <div class="b-tabs">${tabs.map((c) => `<button data-tab="${c}" aria-selected="${c === tab}">${c === "attention" ? `Needs you <b>${attentionSessions().length}</b>` : `${c} <b>${tasksIn(c).length}</b>`}</button>`).join("")}</div>
+    <div class="b-one">${tab === "attention" ? attentionBay() : bay(tab, true)}</div>
+    <button class="b-fab" aria-label="New task">${icon("plus", 20)}</button></div>`;
+}
+
+boot(render, `
+.b{padding:20px 24px 28px;height:100%;box-sizing:border-box;display:flex;flex-direction:column}
+.b-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.b-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.b-head h1{margin:0;font-size:18px;font-weight:750;letter-spacing:-0.01em}
+.b-clock{font-size:12px;color:var(--foregroundMuted);letter-spacing:.04em}
+.b-chip{font-size:12px;font-weight:650;padding:2px 8px;border:1px solid var(--border);color:var(--foregroundMuted)}
+.b-chip.is-late{border-color:var(--statusDanger);color:var(--statusDanger)}
+.b-nav{margin-left:auto;display:flex;gap:4px}
+.b-nav a{font-size:13px;padding:5px 10px;color:var(--foregroundMuted);cursor:pointer}
+.b-nav a[aria-current]{color:var(--foreground);background:var(--surface2)}
+.b-floor{display:grid;grid-template-columns:262px 1fr;gap:18px;flex:1;min-height:0}
+.b-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;min-height:0}
+.b-bay{background:var(--surface1);border:1px solid var(--border);display:flex;flex-direction:column;min-height:0;transition:background .15s}
+.b-bay.is-over{background:var(--surface2)}
+.b-plate{display:flex;align-items:center;gap:6px;padding:8px 8px;white-space:nowrap;border-bottom:1px solid var(--border);font-size:11.5px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+.b-plate .b-mono{color:var(--foregroundMuted);font-weight:500;letter-spacing:0}
+.b-push{margin-left:auto}
+.b-rack{padding:8px 7px;display:flex;flex-direction:column;gap:5px;overflow:auto;flex:1}
+.b-bay-att .b-rack{overflow:visible;background:none;gap:8px}
+.b-strip{background:var(--surface0);border:1px solid var(--border);display:flex;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.b-sess{transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s}
+.b-sess.is-cocked{transform:translateX(16px);box-shadow:0 8px 18px rgba(0,0,0,.28);position:relative;z-index:1}
+.b-sess.is-flush{opacity:.75}
+.b-box{width:46px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:650;border-right:1px solid var(--border)}
+.b-body{padding:8px 10px;min-width:0;flex:1}
+.b-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.b-call{font-weight:750;font-size:13px}
+.b-dim{color:var(--foregroundMuted);font-size:11.5px}
+.b-reason{font-size:12.5px;font-weight:600;margin-top:1px}
+.b-detail{margin:5px 0 6px;font-size:12.5px;line-height:1.4;color:var(--foreground)}
+.b-foot{margin-top:4px}
+.b-task{display:flex;gap:5px;align-items:center;font-size:11.5px;color:var(--foregroundMuted);border-top:1px dashed var(--border);margin-top:7px;padding-top:6px}
+.b-link{font:inherit;font-size:12px;font-weight:600;border:0;background:none;color:var(--foregroundMuted);cursor:pointer;display:inline-flex;gap:4px;align-items:center;padding:2px 4px;letter-spacing:0;text-transform:none}
+.b-link:hover{color:var(--foreground)}
+.b-taskstrip{flex-direction:column;cursor:grab;min-height:57px}
+.b-taskstrip.is-dragging{opacity:.35}
+.b-taskstrip:hover{border-color:var(--foregroundMuted)}
+.b-top{display:flex;border-bottom:1px solid var(--border);font-size:11px}
+.b-due{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;padding:3px 6px;background:var(--surface2);color:var(--foregroundMuted);border-right:1px solid var(--border);font-weight:600;white-space:nowrap}
+.b-due.is-late{background:var(--statusDanger);color:var(--surface0)}
+.b-route{padding:3px 6px;color:var(--foregroundMuted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-title{padding:6px 7px 7px;font-size:12.5px;font-weight:600;line-height:1.35}
+.b-flags{display:flex;flex-wrap:wrap;gap:4px;padding:0 6px 6px}
+.b-flag{display:inline-flex;gap:4px;align-items:center;font-size:10.5px;font-weight:700;padding:1px 5px}
+.is-closed .b-title{text-decoration:line-through;color:var(--foregroundMuted);font-weight:450}
+.is-closed{opacity:.8}
+.b-slot{border:1px dashed var(--border);color:var(--foregroundMuted);font-size:12px;padding:16px 8px;text-align:center}
+.b-reg{display:flex;align-items:center;gap:6px;border:1px dashed var(--border);padding:7px 8px;color:var(--foregroundMuted);margin-top:4px}
+.b-reg input{flex:1;min-width:0;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;border:0;background:none;color:var(--foreground);outline:none}
+.b-compact{padding:14px 14px 0}
+.b-compact .b-head{flex-wrap:wrap;gap:10px}
+.b-tabs{display:flex;gap:4px;overflow-x:auto;margin:0 -14px 10px;padding:0 14px 2px}
+.b-tabs button{font:inherit;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding:7px 10px;border:1px solid var(--border);background:var(--surface1);color:var(--foregroundMuted);cursor:pointer}
+.b-tabs button b{font-family:ui-monospace,Menlo,monospace;font-weight:500;margin-left:4px}
+.b-tabs button[aria-selected="true"]{background:var(--foreground);color:var(--surface0);border-color:var(--foreground)}
+.b-one{flex:1;min-height:0;display:flex;padding-right:16px}
+.b-one .b-bay{flex:1}
+.b-one .b-taskstrip .b-title{font-size:14px}
+.b-fab{position:absolute;right:18px;bottom:18px;width:52px;height:52px;border:0;background:var(--foreground);color:var(--surface0);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,.3)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent);color:var(--accentForeground)}
+`);
+</script>
+</body>
+</html>

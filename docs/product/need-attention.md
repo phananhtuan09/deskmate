@@ -32,6 +32,8 @@ Need attention observes only the sessions the user registered and reminds the us
   - was closed or archived.
 - An attention item MUST clear automatically when its cause clears, such as the permission being resolved or the user sending a new prompt.
 - The user MUST be able to dismiss an attention item.
+- Choosing an attention item or a registered session opens that agent in Paseo.
+- Opening an agent sends nothing to it.
 - Events that happen while Paseo or the plugin is not running MAY be missed; on startup Deskmate MUST refresh each registered session from its current state instead of replaying history.
 
 ### Conversation review

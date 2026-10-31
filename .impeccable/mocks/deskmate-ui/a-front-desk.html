@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deskmate · A · Front desk</title>
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+<div class="mock-bar">
+  <div>
+    <h1>A · Front desk</h1>
+    <p>Each registered session is a numbered pigeonhole; when it needs you, a slip sticks out of its box. Your tasks live below in a ruled ledger, five columns wide. Drag a ledger line to another column, dismiss a slip to see it clear.</p>
+    <p class="mock-note">Synthetic data · colors are an approximation of Paseo theme tokens · <a href="index.html">all options</a></p>
+  </div>
+  <div class="mock-tools"><button data-theme-btn="dark">Dark</button><button data-theme-btn="light">Light</button></div>
+</div>
+<div class="mock-stage">
+  <div><p class="frame-label">Desktop · 1280</p><div class="frame frame-desktop" data-frame="desktop"></div></div>
+  <div><p class="frame-label">Mobile · 390</p><div class="frame frame-mobile" data-frame="mobile"></div></div>
+</div>
+<script src="shared.js"></script>
+<script>
+const toneVar = (tone) => tone === "muted" ? "var(--foregroundMuted)" : tone === "accent" ? "var(--accent)" : `var(--status${tone[0].toUpperCase()}${tone.slice(1)})`;
+
+function cubby(s, i, compact) {
+  const r = REASONS[s.status];
+  const linked = STATE.tasks.find((t) => t.sessions.includes(s.id) && t.status !== "Closed");
+  const slip = needsYou(s) ? `
+    <div class="a-slip" style="--tone:${toneVar(r.tone)}">
+      <div class="a-slip-head">${icon(r.icon, 14)}<span>${r.long}</span></div>
+      <p class="a-slip-detail">${esc(s.detail)}</p>
+      <div class="a-wait"><span class="a-wait-bar" style="width:${Math.min(100, 12 + s.since * 3)}%"></span><span class="a-wait-t">${sinceLabel(s.since)}</span></div>
+      <div class="a-slip-foot">${linked ? `<span class="a-slip-task">${icon("link", 12)}${esc(linked.title)}</span>` : "<span></span>"}<button class="a-btn-quiet" data-dismiss="${s.id}">Dismiss</button></div>
+    </div>` : `<div class="a-empty">${icon(r.icon, 14)}<span>${s.dismissed ? "Dismissed" : r.long}</span></div>`;
+  return `<section class="a-cubby ${needsYou(s) ? "has-slip" : ""}" aria-label="Pigeonhole ${i + 1}, ${esc(s.label)}">
+    <header class="a-plate"><span class="a-no">${String(i + 1).padStart(2, "0")}</span><span class="a-name">${esc(s.label)}</span></header>
+    <div class="a-meta">${s.provider} · ${s.workspace} · since ${s.registered}</div>
+    ${slip}
+  </section>`;
+}
+
+function registerCubby() {
+  return `<section class="a-cubby a-cubby-new"><header class="a-plate"><span class="a-no">${String(STATE.sessions.length + 1).padStart(2, "0")}</span><span class="a-name a-muted">Empty</span></header>
+    <label class="a-reg"><span>Register a session</span><input placeholder="Paste a Paseo agent id"></label></section>`;
+}
+
+function line(t) {
+  const late = isOverdue(t);
+  const linked = t.sessions.map(session).filter(needsYou);
+  const boxNo = (s) => String(STATE.sessions.indexOf(s) + 1).padStart(2, "0");
+  return `<li class="a-line ${t.status === "Closed" ? "is-closed" : ""}" data-task="${t.id}">
+    <span class="a-title">${esc(t.title)}</span>
+    <span class="a-sub">${t.project ? `<span>${esc(t.project)}</span>` : ""}<span class="a-due ${late ? "is-late" : ""}">${dueShort(t)}</span>${late ? `<span class="a-stamp">Overdue ${daysLate(t)}d</span>` : ""}</span>
+    ${linked.map((s) => `<span class="a-ref" style="--tone:${toneVar(REASONS[s.status].tone)}">${icon(REASONS[s.status].icon, 12)}Slip in ${boxNo(s)} · ${REASONS[s.status].short}</span>`).join("")}
+  </li>`;
+}
+
+function column(col) {
+  const items = tasksIn(col);
+  return `<div class="a-col" data-col="${col}">
+    <header class="a-col-head"><span>${col}</span><span class="a-count">${items.length}</span>${col === "Closed" && items.length ? `<button class="a-btn-quiet a-clear" data-clear-closed>${icon("trash", 13)}Clear all</button>` : ""}${col === "Todo" ? `<button class="a-btn-quiet a-add" aria-label="New task">${icon("plus", 14)}</button>` : ""}</header>
+    <ol class="a-lines">${items.map(line).join("") || `<li class="a-blank">Nothing here</li>`}</ol>
+  </div>`;
+}
+
+function render(compact) {
+  const att = attentionSessions().length, late = overdueTasks().length;
+  const head = `<header class="a-head">
+      <div><h1 class="a-date">Saturday, 31 October</h1>
+      <p class="a-sum"><b>${att}</b> ${att === 1 ? "session needs" : "sessions need"} you · <b>${late}</b> overdue ${late === 1 ? "task" : "tasks"}</p></div>
+      ${compact ? "" : `<nav class="a-nav"><a aria-current="page">Board</a><a>Projects</a></nav><button class="a-btn">${icon("plus", 15)}New task</button>`}
+    </header>`;
+  const rack = `<div class="a-rack">${STATE.sessions.map((s, i) => cubby(s, i, compact)).join("")}${registerCubby()}</div>`;
+  if (!compact) return `<div class="a">${head}${rack}<div class="a-ledger">${COLUMNS.map(column).join("")}</div></div>`;
+  const tab = COLUMNS.includes(window.MOBILE_TAB) ? window.MOBILE_TAB : "Todo";
+  return `<div class="a a-compact">${head}${rack}
+    <div class="a-tabs" role="tablist">${COLUMNS.map((c) => `<button role="tab" data-tab="${c}" aria-selected="${c === tab}">${c}<span>${tasksIn(c).length}</span></button>`).join("")}</div>
+    <div class="a-ledger">${column(tab)}</div>
+    <button class="a-fab" aria-label="New task">${icon("plus", 20)}</button></div>`;
+}
+
+boot(render, `
+.a{padding:28px 32px 40px;min-height:100%;box-sizing:border-box}
+.a-head{display:flex;align-items:flex-end;gap:20px;margin-bottom:26px}
+.a-date{margin:0;font-size:26px;line-height:1.1;font-weight:700;letter-spacing:-0.02em}
+.a-sum{margin:6px 0 0;color:var(--foregroundMuted);font-variant-numeric:tabular-nums}
+.a-sum b{color:var(--foreground);font-weight:650}
+.a-nav{margin-left:auto;display:flex;gap:2px;border-bottom:1px solid var(--border)}
+.a-nav a{padding:6px 12px;color:var(--foregroundMuted);font-size:13px;cursor:pointer;margin-bottom:-1px;border-bottom:1px solid transparent}
+.a-nav a[aria-current]{color:var(--foreground);border-bottom-color:var(--foreground)}
+.a-btn{display:inline-flex;gap:6px;align-items:center;font:inherit;font-size:13px;font-weight:600;padding:7px 12px;border:1px solid var(--foreground);background:var(--foreground);color:var(--surface0);cursor:pointer}
+.a-btn-quiet{display:inline-flex;gap:5px;align-items:center;font:inherit;font-size:12px;padding:3px 6px;border:0;background:none;color:var(--foregroundMuted);cursor:pointer}
+.a-btn-quiet:hover{color:var(--foreground)}
+.a-rack{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-right:0;margin-top:14px}
+.a-cubby{border-right:1px solid var(--border);padding:12px 14px 14px;min-height:168px;position:relative;background:var(--surface1);display:flex;flex-direction:column}
+.a-cubby-new{background:transparent}
+.a-plate{display:flex;align-items:baseline;gap:10px}
+.a-no{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--foregroundMuted);border:1px solid var(--border);padding:3px 5px;background:var(--surface0)}
+.a-name{font-weight:650;font-size:14px}
+.a-muted{color:var(--foregroundMuted);font-weight:500}
+.a-meta{color:var(--foregroundMuted);font-size:12px;margin:4px 0 12px}
+.a-slip{margin-top:auto;background:var(--surface0);border:1px solid var(--border);border-top:2px solid var(--tone);padding:10px 11px 8px;box-shadow:0 6px 16px rgba(0,0,0,.18);transform:translateY(-4px) rotate(-.6deg);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.a-cubby:nth-child(2) .a-slip{transform:translateY(-4px) rotate(.5deg)}
+.a-slip:hover{transform:translateY(-8px) rotate(0)}
+.a-slip-head{display:flex;gap:6px;align-items:center;color:var(--tone);font-weight:650;font-size:13px}
+.a-slip-detail{margin:6px 0 8px;font-size:13px;line-height:1.4}
+.a-wait{display:flex;align-items:center;gap:8px}
+.a-wait-bar{height:1px;background:var(--tone);flex:none}
+.a-wait-t{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--foregroundMuted);font-variant-numeric:tabular-nums}
+.a-slip-foot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px}
+.a-slip-task{display:inline-flex;gap:5px;align-items:center;font-size:12px;color:var(--foregroundMuted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a-empty{margin-top:auto;display:flex;gap:6px;align-items:center;color:var(--foregroundMuted);font-size:13px;border-top:1px dashed var(--border);padding-top:10px}
+.a-reg{margin-top:auto;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--foregroundMuted)}
+.a-reg input{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;padding:7px 8px;border:1px solid var(--border);background:var(--surface0);color:var(--foreground);outline:none}
+.a-reg input:focus{border-color:var(--accent)}
+.a-ledger{display:grid;grid-template-columns:repeat(5,1fr);margin-top:28px;border-top:2px solid var(--foreground)}
+.a-col{border-right:1px solid var(--border);min-height:300px;transition:background .15s}
+.a-col:last-child{border-right:0}
+.a-col.is-over{background:var(--surface1)}
+.a-col-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border);font-weight:650;font-size:13px}
+.a-count{color:var(--foregroundMuted);font-weight:500;font-variant-numeric:tabular-nums}
+.a-clear,.a-add{margin-left:auto}
+.a-lines{list-style:none;margin:0;padding:0}
+.a-line{padding:10px 12px 11px;border-bottom:1px solid var(--border);cursor:grab;display:flex;flex-direction:column;gap:4px;background:var(--surface0)}
+.a-line:hover{background:var(--surface1)}
+.a-line.is-dragging{opacity:.4}
+.a-title{font-size:13.5px;font-weight:550;line-height:1.35}
+.a-sub{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--foregroundMuted);flex-wrap:wrap}
+.a-due{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.a-due.is-late{color:var(--statusDanger)}
+.a-stamp{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--statusDanger);border:1px solid var(--statusDanger);padding:0 4px;transform:rotate(-2deg)}
+.a-ref{display:inline-flex;align-self:flex-start;gap:5px;align-items:center;font-size:12px;color:var(--tone);font-weight:600}
+.is-closed .a-title{text-decoration:line-through;color:var(--foregroundMuted);font-weight:450}
+.a-blank{padding:14px 12px;color:var(--foregroundMuted);font-size:12px}
+.a-compact{padding:18px 16px 90px}
+.a-compact .a-head{margin-bottom:10px}
+.a-compact .a-date{font-size:22px}
+.a-compact .a-rack{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin:10px -16px 0;border-left:0;border-right:0}
+.a-compact .a-cubby{flex:0 0 78%;scroll-snap-align:start;min-height:180px}
+.a-compact .a-ledger{grid-template-columns:1fr;margin-top:0;border-top:0}
+.a-compact .a-col-head{display:none}
+.a-tabs{display:flex;overflow-x:auto;gap:0;margin:22px -16px 0;padding:0 16px;border-bottom:2px solid var(--foreground)}
+.a-tabs button{font:inherit;font-size:13px;font-weight:600;padding:9px 11px;border:0;background:none;color:var(--foregroundMuted);display:flex;gap:6px;cursor:pointer;white-space:nowrap}
+.a-tabs button span{font-weight:450;font-variant-numeric:tabular-nums}
+.a-tabs button[aria-selected="true"]{color:var(--surface0);background:var(--foreground)}
+.a-fab{position:sticky;float:right;bottom:18px;margin-top:20px;width:52px;height:52px;border:0;background:var(--foreground);color:var(--surface0);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,.3)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent);color:var(--accentForeground)}
+`);
+</script>
+</body>
+</html>

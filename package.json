@@ -8,8 +8,7 @@
     "index.server.ts",
     "client/",
     "server/",
-    "shared/",
-    "core/"
+    "shared/"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
