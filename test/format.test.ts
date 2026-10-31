@@ -17,3 +17,13 @@ test("a corrupt state file is rejected instead of being treated as empty", () =>
   broken.tasks.push({ id: "t1", title: "Bad", dueDate: "2026-02-31", column: "todo", sessionIds: [], createdAt: "x", updatedAt: "x" });
   assert.throws(() => parseState(JSON.stringify(broken)), /calendar date/);
 });
+
+test("legacy waiting_for_user entries are dropped when the state is read", () => {
+  const state = registerSession(emptyState(), { sessionId: "ag_1" }, new Date(2026, 9, 31)).state;
+  const raw = JSON.parse(serializeState(state));
+  raw.attention = [{ sessionId: "ag_1", reason: "waiting_for_user", since: "1" }, { sessionId: "ag_1", reason: "turn_failed", since: "2" }];
+  raw.dismissed = [{ sessionId: "ag_1", reason: "waiting_for_user", since: "1" }];
+  const parsed = parseState(JSON.stringify(raw));
+  assert.deepEqual(parsed.attention.map((item) => item.reason), ["turn_failed"]);
+  assert.deepEqual(parsed.dismissed, []);
+});

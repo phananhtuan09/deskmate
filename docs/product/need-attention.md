@@ -27,9 +27,9 @@ Need attention observes only the sessions the user registered and reminds the us
 
 - Deskmate MUST create an attention item when a registered session:
   - is waiting for a permission decision;
-  - finished a turn and is waiting for the user to reply;
   - had a turn fail or get canceled;
   - was closed or archived.
+- Deskmate MUST NOT create an attention item when a turn finishes normally, because the user does not need a reminder for every agent reply.
 - An attention item MUST clear automatically when its cause clears, such as the permission being resolved or the user sending a new prompt.
 - The user MUST be able to dismiss an attention item.
 - Choosing an attention item or a registered session opens that agent in Paseo.

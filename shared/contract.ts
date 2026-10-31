@@ -2,7 +2,7 @@ import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
 const column = z.enum(["todo", "doing", "done", "pending", "closed"]);
-const reason = z.enum(["permission_pending", "waiting_for_user", "turn_failed", "turn_canceled", "session_ended"]);
+const reason = z.enum(["permission_pending", "turn_failed", "turn_canceled", "session_ended"]);
 
 const taskSchema = z.object({
   id: z.string(),

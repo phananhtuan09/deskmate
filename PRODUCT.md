@@ -28,7 +28,7 @@ Accepted behavior lives in `docs/product/` (task board, projects, need attention
 ## Operating Context
 
 - Surfaces in v1: task board (kanban `Todo`, `Doing`, `Done`, `Pending`, `Closed`, drag to move), Projects screen, Need attention screen, a sidebar item with a reminder count, and in-app toasts.
-- Attention reasons: waiting for permission, finished a turn and waiting for reply, turn failed or canceled, session closed or archived.
+- Attention reasons: waiting for permission, turn failed or canceled, session closed or archived.
 - Tasks have title, optional note, optional project, date-only due date (defaults to creation date), read-only created/updated times, and zero or more linked sessions.
 
 ## Capabilities and Constraints

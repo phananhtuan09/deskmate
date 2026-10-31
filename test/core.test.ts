@@ -26,9 +26,7 @@ test("attention follows permission and turn events of registered sessions only",
   assert.deepEqual(items.map((item) => item.reason), ["permission_pending"]);
   items = applySessionEvent(items, registered, { type: "permission_resolved", sessionId: "a1", requestId: "p1", at: "2" });
   items = applySessionEvent(items, registered, { type: "turn_ended", sessionId: "a1", outcome: "completed", at: "3" });
-  assert.deepEqual(items.map((item) => item.reason), ["waiting_for_user"]);
-  items = applySessionEvent(items, registered, { type: "turn_started", sessionId: "a1", at: "4" });
-  assert.deepEqual(items, [], "a new turn clears the wait");
+  assert.deepEqual(items, [], "a finished turn is not an attention item");
   items = applySessionEvent(items, registered, { type: "turn_ended", sessionId: "a1", outcome: "failed", at: "5" });
   items = applySessionEvent(items, registered, { type: "turn_ended", sessionId: "a1", outcome: "canceled", at: "6" });
   items = applySessionEvent(items, registered, { type: "session_ended", sessionId: "a1", at: "7" });

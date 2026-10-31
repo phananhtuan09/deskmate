@@ -6,7 +6,6 @@ import type { AttentionReason } from "../shared/core";
 
 const REASONS: Record<AttentionReason, { label: string; long: string; icon: string; tone: "statusWarning" | "accent" | "statusDanger" | "foregroundMuted" }> = {
   permission_pending: { label: "Permission", long: "Waiting for your permission", icon: "Shield", tone: "statusWarning" },
-  waiting_for_user: { label: "Your turn", long: "Finished, waiting for your reply", icon: "MessageSquare", tone: "accent" },
   turn_failed: { label: "Failed", long: "Turn failed", icon: "AlertTriangle", tone: "statusDanger" },
   turn_canceled: { label: "Canceled", long: "Turn canceled", icon: "Ban", tone: "statusWarning" },
   session_ended: { label: "Closed", long: "Session closed", icon: "XCircle", tone: "foregroundMuted" },

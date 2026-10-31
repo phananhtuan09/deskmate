@@ -78,9 +78,13 @@ function parseSession(value: unknown): RegisteredSession {
   return session;
 }
 
-function parseAttention(value: unknown): AttentionItem {
+// Earlier versions stored a "waiting_for_user" reason; those entries are dropped on load.
+const LEGACY_REASON = "waiting_for_user";
+
+function parseAttention(value: unknown): AttentionItem | null {
   if (!isRecord(value)) throw new StateFormatError("Deskmate state has an invalid attention item.");
   const reason = text(value.reason, "attention reason");
+  if (reason === LEGACY_REASON) return null;
   if (!isAttentionReason(reason)) throw new StateFormatError("Deskmate state has an unknown attention reason.");
   const item: AttentionItem = { sessionId: text(value.sessionId, "attention session id"), reason, since: text(value.since, "attention since") };
   const requestId = optionalText(value.requestId, "attention request id");
@@ -90,9 +94,10 @@ function parseAttention(value: unknown): AttentionItem {
   return item;
 }
 
-function parseDismissal(value: unknown): AttentionDismissal {
+function parseDismissal(value: unknown): AttentionDismissal | null {
   if (!isRecord(value)) throw new StateFormatError("Deskmate state has an invalid dismissal.");
   const reason = text(value.reason, "dismissal reason");
+  if (reason === LEGACY_REASON) return null;
   if (!isAttentionReason(reason)) throw new StateFormatError("Deskmate state has an unknown dismissal reason.");
   const entry: AttentionDismissal = { sessionId: text(value.sessionId, "dismissal session id"), reason, since: text(value.since, "dismissal since") };
   const requestId = optionalText(value.requestId, "dismissal request id");
@@ -118,8 +123,8 @@ export function parseState(raw: string): DeskmateState {
     tasks: arrayOf(value.tasks, "tasks", parseTask),
     projects: arrayOf(value.projects, "projects", parseProject),
     sessions: arrayOf(value.sessions, "sessions", parseSession),
-    attention: arrayOf(value.attention, "attention", parseAttention),
-    dismissed: arrayOf(value.dismissed, "dismissed", parseDismissal),
+    attention: arrayOf(value.attention, "attention", parseAttention).filter((item): item is AttentionItem => item !== null),
+    dismissed: arrayOf(value.dismissed, "dismissed", parseDismissal).filter((entry): entry is AttentionDismissal => entry !== null),
   };
   unique(state.tasks.map((task) => task.id), "task id");
   unique(state.projects.map((project) => project.id), "project id");

@@ -137,7 +137,7 @@ export function startDeskmate(server: PluginServerContext, settings: StorageSett
     server.on("agent.turn_ended", (event, hook) => {
       // The timeline is intentionally unused. Version 1 does not review the conversation.
       const outcome = event.outcome.kind === "completed" ? "completed" : event.outcome.kind === "canceled" ? "canceled" : "failed";
-      const detail = event.outcome.kind === "failed" ? event.outcome.error.message : event.outcome.kind === "canceled" ? event.outcome.reason : "Finished and waiting for your reply";
+      const detail = event.outcome.kind === "failed" ? event.outcome.error.message : event.outcome.kind === "canceled" ? event.outcome.reason : undefined;
       return onRegistered(event.agent, { type: "turn_ended", sessionId: event.agent.id, outcome, at: new Date().toISOString(), detail }, hook.paseo);
     }),
     server.on("agent.closed", (event, hook) => onRegistered(event.agent, {

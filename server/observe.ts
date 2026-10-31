@@ -29,7 +29,6 @@ export function observationFromAgent(sessionId: string, agent: HostAgentSnapshot
   const first = permissions[0];
   let turnDetail: string | undefined;
   if (ended) turnDetail = agent.archivedAt ? "Session archived" : "Session closed";
-  else if (turn === "completed") turnDetail = "Finished and waiting for your reply";
   else if (turn === "failed") turnDetail = clean(agent.lastError) ?? "Turn failed";
   return {
     sessionId,

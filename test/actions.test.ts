@@ -148,12 +148,13 @@ test("dismiss hides the current cause and a new occurrence shows up", () => {
   assert.equal(reminderCount(state, now), 0);
 });
 
-test("a waiting turn stays dismissed until a later turn, and overdue tasks count with attention", () => {
+test("a failed turn stays dismissed until a later turn, and overdue tasks count with attention", () => {
   let state = registerSession(emptyState(), { sessionId: "ag_1", label: "docs" }, now).state;
-  state = refreshSession(state, idle("ag_1", { at: "2026-10-31T14:00:00.000Z", turn: "completed" })).state;
+  state = command(state, { type: "applyEvent", event: { type: "turn_ended", sessionId: "ag_1", outcome: "completed", at: "2026-10-31T14:00:00.000Z" } }).state;
+  assert.equal(reminderCount(state, now), 0, "a finished turn does not remind");
+  state = command(state, { type: "applyEvent", event: { type: "turn_ended", sessionId: "ag_1", outcome: "failed", at: "2026-10-31T15:00:00.000Z", detail: "boom" } }).state;
   const since = state.attention[0].since;
-  state = command(state, { type: "dismissAttention", sessionId: "ag_1", reason: "waiting_for_user", since }).state;
-  state = refreshSession(state, idle("ag_1", { at: "2026-10-31T14:00:00.000Z", turn: "completed" })).state;
+  state = command(state, { type: "dismissAttention", sessionId: "ag_1", reason: "turn_failed", since }).state;
   assert.equal(reminderCount(state, now), 0);
   state = command(state, { type: "applyEvent", event: { type: "turn_ended", sessionId: "ag_1", outcome: "failed", at: "2026-10-31T19:00:00.000Z", detail: "tests failed" } }).state;
   assert.deepEqual(state.attention.map((item) => item.reason), ["turn_failed"]);

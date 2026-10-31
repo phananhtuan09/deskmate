@@ -37,7 +37,7 @@ test("refresh from a snapshot keeps linked-task attention and drops history the 
   state = createTask(state, { title: "Review", sessionIds: ["ag_1"], dueDate: "2026-10-31" }, new Date(2026, 9, 31, 8), "t1").state;
   state = refreshSession(state, observationFromAgent("ag_1", agent({ attentionReason: "finished", attentionTimestamp: "2026-10-31T14:00:00.000Z", title: "docs-sweep", provider: "claude", cwd: "/work/deskmate" }), "now")).state;
   assert.equal(state.sessions[0].label, "docs-sweep");
-  assert.deepEqual(attentionForTask(state, state.tasks[0]).map((item) => item.reason), ["waiting_for_user"]);
+  assert.deepEqual(attentionForTask(state, state.tasks[0]), [], "a finished turn is not an attention item");
   state = refreshSession(state, observationFromAgent("ag_1", agent({ status: "running" }), "now")).state;
   assert.deepEqual(attentionForTask(state, state.tasks[0]), []);
   state = refreshSession(state, goneObservation("ag_1", "2026-10-31T18:00:00.000Z")).state;

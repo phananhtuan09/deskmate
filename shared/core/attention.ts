@@ -7,9 +7,9 @@ export type SessionEvent =
   | { type: "turn_ended"; sessionId: string; outcome: "completed" | "failed" | "canceled"; at: string; detail?: string }
   | { type: "session_ended"; sessionId: string; at: string; detail?: string };
 
-export type AttentionReason = "permission_pending" | "waiting_for_user" | "turn_failed" | "turn_canceled" | "session_ended";
+export type AttentionReason = "permission_pending" | "turn_failed" | "turn_canceled" | "session_ended";
 
-export const ATTENTION_REASONS: readonly AttentionReason[] = ["permission_pending", "waiting_for_user", "turn_failed", "turn_canceled", "session_ended"];
+export const ATTENTION_REASONS: readonly AttentionReason[] = ["permission_pending", "turn_failed", "turn_canceled", "session_ended"];
 
 export function isAttentionReason(value: string): value is AttentionReason {
   return (ATTENTION_REASONS as readonly string[]).includes(value);
@@ -49,8 +49,9 @@ export interface SessionObservation {
   workspace?: string;
 }
 
-const TURN_REASONS: ReadonlySet<AttentionReason> = new Set(["waiting_for_user", "turn_failed", "turn_canceled"]);
-const TURN_OUTCOME_REASON = { completed: "waiting_for_user", failed: "turn_failed", canceled: "turn_canceled" } as const;
+const TURN_REASONS: ReadonlySet<AttentionReason> = new Set(["turn_failed", "turn_canceled"]);
+// A finished turn is not an attention reason: the user does not need a reminder for every agent reply.
+const TURN_OUTCOME_REASON = { failed: "turn_failed", canceled: "turn_canceled" } as const;
 
 function clip(detail: string | undefined): string | undefined {
   const text = detail?.trim();
@@ -99,6 +100,7 @@ export function applySessionEvent(items: readonly AttentionItem[], registered: R
     case "turn_started":
       return [...others, ...own.filter((item) => !TURN_REASONS.has(item.reason))];
     case "turn_ended":
+      if (event.outcome === "completed") return [...others, ...own.filter((item) => !TURN_REASONS.has(item.reason))];
       return [...others, ...own.filter((item) => !TURN_REASONS.has(item.reason)), withDetail({ sessionId: event.sessionId, reason: TURN_OUTCOME_REASON[event.outcome], since: event.at }, event.detail)];
     case "session_ended":
       return [...others, withDetail({ sessionId: event.sessionId, reason: "session_ended", since: event.at }, event.detail)];
@@ -119,7 +121,6 @@ function deriveAttention(observation: SessionObservation): AttentionItem[] {
   if (observation.unspecifiedPermission && observation.permissionRequestIds.length === 0) {
     items.push(withDetail({ sessionId: observation.sessionId, reason: "permission_pending", since: observation.at }, observation.permissionDetail));
   }
-  if (!observation.running && observation.turn === "completed") items.push(withDetail({ sessionId: observation.sessionId, reason: "waiting_for_user", since: observation.at }, observation.turnDetail));
   if (!observation.running && observation.turn === "failed") items.push(withDetail({ sessionId: observation.sessionId, reason: "turn_failed", since: observation.at }, observation.turnDetail));
   if (!observation.running && observation.turn === "canceled") items.push(withDetail({ sessionId: observation.sessionId, reason: "turn_canceled", since: observation.at }, observation.turnDetail));
   return items;

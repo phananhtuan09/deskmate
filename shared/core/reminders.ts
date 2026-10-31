@@ -10,7 +10,6 @@ export interface Reminder {
 
 const ATTENTION_MESSAGE: Record<AttentionReason, (name: string) => string> = {
   permission_pending: (name) => `${name} is waiting for permission`,
-  waiting_for_user: (name) => `${name} is waiting for your reply`,
   turn_failed: (name) => `${name} had a turn fail`,
   turn_canceled: (name) => `${name} had a turn canceled`,
   session_ended: (name) => `${name} was closed`,
