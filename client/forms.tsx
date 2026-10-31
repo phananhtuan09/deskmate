@@ -13,10 +13,23 @@ function projectLabel(project: Project, projects: readonly Project[]): string {
   return shared && folder ? `${project.name} (${folder})` : project.name;
 }
 
-function sessionLabel(session: DeskmateState["sessions"][number], sessions: DeskmateState["sessions"]): string {
-  const name = session.label || session.id;
-  const shared = sessions.filter((entry) => (entry.label || entry.id) === name).length > 1;
-  return shared ? `${name} (${session.id.slice(0, 6)})` : name;
+function sessionMeta(session: DeskmateState["sessions"][number], projects: readonly Project[]): string {
+  const workspace = session.workspace;
+  const project = workspace ? projects.find((entry) => workspace === entry.path || workspace.startsWith(`${entry.path}/`)) : undefined;
+  const folder = workspace?.split(/[/\\]/).filter(Boolean).at(-1);
+  return [project?.name ?? folder, session.provider].filter(Boolean).join(" · ") || session.id;
+}
+
+function LinkedSessionRow({ theme, name, meta, actionLabel = "Remove", actionTone = "danger", onOpen, onAction }: { theme: PluginTheme; name: string; meta: string; actionLabel?: string; actionTone?: "muted" | "danger"; onOpen?: () => void; onAction: () => void }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, padding: 10, backgroundColor: theme.colors.surface0 }}>
+      <Pressable accessibilityRole={onOpen ? "button" : undefined} accessibilityLabel={onOpen ? `Open ${name}` : undefined} disabled={!onOpen} onPress={onOpen} style={{ flex: 1, gap: 4, cursor: onOpen ? "pointer" : "auto" }}>
+        <Text style={{ color: theme.colors.foreground, fontSize: 14, fontWeight: "600" }}>{name}</Text>
+        <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>{meta}</Text>
+      </Pressable>
+      <GhostButton theme={theme} label={actionLabel} tone={actionTone} onPress={onAction} />
+    </View>
+  );
 }
 
 function FieldLabel({ theme, label, children }: { theme: PluginTheme; label: string; children: ReactNode }) {
@@ -28,7 +41,7 @@ function FieldLabel({ theme, label, children }: { theme: PluginTheme; label: str
   );
 }
 
-export function TaskDialog({ theme, state, now, mode, task, busy, onClose, onSubmit, onMove }: { theme: PluginTheme; state: DeskmateState; now: Date; mode: "create" | "edit"; task: Task | null; busy: boolean; onClose: () => void; onSubmit: (command: DeskmateMutation) => Promise<unknown>; onMove: (column: TaskColumn) => Promise<unknown> }) {
+export function TaskDialog({ theme, state, now, mode, task, busy, onClose, onSubmit, onMove, onOpenSession }: { theme: PluginTheme; state: DeskmateState; now: Date; mode: "create" | "edit"; task: Task | null; busy: boolean; onClose: () => void; onSubmit: (command: DeskmateMutation) => Promise<unknown>; onMove: (column: TaskColumn) => Promise<unknown>; onOpenSession?: (sessionId: string) => void }) {
   if (mode === "edit" && !task) {
     return (
       <Modal title="Edit task" open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -39,10 +52,10 @@ export function TaskDialog({ theme, state, now, mode, task, busy, onClose, onSub
       </Modal>
     );
   }
-  return <TaskForm key={task?.id ?? "new"} theme={theme} state={state} now={now} task={task} busy={busy} onClose={onClose} onSubmit={onSubmit} onMove={onMove} />;
+  return <TaskForm key={task?.id ?? "new"} theme={theme} state={state} now={now} task={task} busy={busy} onClose={onClose} onSubmit={onSubmit} onMove={onMove} onOpenSession={onOpenSession} />;
 }
 
-function TaskForm({ theme, state, now, task, busy, onClose, onSubmit, onMove }: { theme: PluginTheme; state: DeskmateState; now: Date; task: Task | null; busy: boolean; onClose: () => void; onSubmit: (command: DeskmateMutation) => Promise<unknown>; onMove: (column: TaskColumn) => Promise<unknown> }) {
+function TaskForm({ theme, state, now, task, busy, onClose, onSubmit, onMove, onOpenSession }: { theme: PluginTheme; state: DeskmateState; now: Date; task: Task | null; busy: boolean; onClose: () => void; onSubmit: (command: DeskmateMutation) => Promise<unknown>; onMove: (column: TaskColumn) => Promise<unknown>; onOpenSession?: (sessionId: string) => void }) {
   const [title, setTitle] = useState(task?.title ?? "");
   const [note, setNote] = useState(task?.note ?? "");
   const [projectId, setProjectId] = useState(task?.projectId ?? "");
@@ -50,8 +63,10 @@ function TaskForm({ theme, state, now, task, busy, onClose, onSubmit, onMove }: 
   const [sessionIds, setSessionIds] = useState(task?.sessionIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState(false);
   const knownSessions = new Set(state.sessions.map((session) => session.id));
   const unknownSessions = sessionIds.filter((id) => !knownSessions.has(id));
+  const unlinkedSessions = state.sessions.filter((session) => !sessionIds.includes(session.id));
 
   async function save() {
     if (saving || busy) return;
@@ -118,11 +133,22 @@ function TaskForm({ theme, state, now, task, busy, onClose, onSubmit, onMove }: 
         </FieldLabel>
         {state.projects.length === 0 ? <EmptyNote theme={theme} message="No projects yet. Add one on the Projects screen." /> : null}
         <TextField theme={theme} label="Due date" value={dueDate} onChangeText={setDueDate} placeholder={localDate(now)} />
-        <FieldLabel theme={theme} label="Linked sessions">
-          {state.sessions.map((session) => <Choice key={session.id} theme={theme} label={sessionLabel(session, state.sessions)} selected={sessionIds.includes(session.id)} onPress={() => toggleSession(session.id)} />)}
-          {unknownSessions.map((id) => <Choice key={id} theme={theme} label={`${id} (not registered)`} selected onPress={() => toggleSession(id)} />)}
-        </FieldLabel>
-        {state.sessions.length === 0 && unknownSessions.length === 0 ? <EmptyNote theme={theme} message="Register a session before linking it." /> : null}
+        <View style={{ gap: 8 }}>
+          <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>Linked sessions</Text>
+          {sessionIds.length === 0 ? <EmptyNote theme={theme} message="No session linked." /> : sessionIds.map((id) => {
+            const session = state.sessions.find((entry) => entry.id === id);
+            return <LinkedSessionRow key={id} theme={theme} name={session ? session.label || session.id : id} meta={session ? sessionMeta(session, state.projects) : "Not registered"} onOpen={session && onOpenSession ? () => { onClose(); onOpenSession(id); } : undefined} onAction={() => toggleSession(id)} />;
+          })}
+          {unlinkedSessions.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row" }}>
+                <GhostButton theme={theme} label={picking ? "Hide sessions" : "Add session"} icon={picking ? "ChevronUp" : "Plus"} onPress={() => setPicking((open) => !open)} />
+              </View>
+              {picking ? unlinkedSessions.map((session) => <LinkedSessionRow key={session.id} theme={theme} name={session.label || session.id} meta={sessionMeta(session, state.projects)} actionLabel="Add" actionTone="muted" onAction={() => toggleSession(session.id)} />) : null}
+            </View>
+          ) : null}
+          {state.sessions.length === 0 ? <EmptyNote theme={theme} message="Register a session in the Sessions tab before linking it." /> : null}
+        </View>
         {task ? (
           <View style={{ gap: 6 }}>
             <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>Created {timeLabel(task.createdAt)}</Text>
@@ -199,70 +225,7 @@ function ProjectForm({ theme, project, busy, onClose, onSubmit }: { theme: Plugi
   );
 }
 
-export function RegisterDialog({ theme, state, busy, onClose, onSubmit, onUnregister, onOpenSession }: { theme: PluginTheme; state: DeskmateState; busy: boolean; onClose: () => void; onSubmit: (sessionId: string) => Promise<unknown>; onUnregister: (sessionId: string) => Promise<unknown>; onOpenSession?: (sessionId: string) => void }) {
-  const [agentId, setAgentId] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  async function register() {
-    if (saving || busy) return;
-    const sessionId = agentId.trim();
-    if (!sessionId) {
-      setError("Enter an agent id.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setNotice(null);
-    try {
-      await onSubmit(sessionId);
-      setAgentId("");
-      setNotice("Registered.");
-    } catch (caught) {
-      setError(errorText(caught));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function unregister(sessionId: string) {
-    setRowError(null);
-    try {
-      await onUnregister(sessionId);
-    } catch (caught) {
-      setRowError(errorText(caught));
-    }
-  }
-
-  return (
-    <Modal title="Register session" open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <Modal.Content>
-        <Text style={{ color: theme.colors.foregroundMuted, fontSize: 13 }}>Paste a Paseo agent id, or run /deskmate in that agent's chat. Deskmate only observes registered sessions.</Text>
-        <TextField theme={theme} label="Agent id" value={agentId} onChangeText={setAgentId} placeholder="agent id" error={error} />
-        {notice ? <Text style={{ color: theme.colors.statusSuccess, fontSize: 13 }}>{notice}</Text> : null}
-        <PrimaryButton theme={theme} label={saving ? "Registering…" : "Register"} onPress={() => { void register(); }} disabled={saving || busy} />
-        {state.sessions.length === 0 ? <EmptyNote theme={theme} message="No sessions registered." /> : state.sessions.map((session) => {
-          const name = session.label || session.id;
-          return (
-            <View key={session.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, padding: 10, backgroundColor: theme.colors.surface0 }}>
-              <Pressable accessibilityRole={onOpenSession ? "button" : undefined} accessibilityLabel={onOpenSession ? `Open ${name}` : undefined} disabled={!onOpenSession} onPress={() => onOpenSession?.(session.id)} style={{ flex: 1, gap: 4, cursor: onOpenSession ? "pointer" : "auto" }}>
-                <Text style={{ color: theme.colors.foreground, fontSize: 14, fontWeight: "600" }}>{name}</Text>
-                <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>{session.id}</Text>
-                {session.workspace ? <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>{session.workspace}</Text> : null}
-              </Pressable>
-              <GhostButton theme={theme} label="Unregister" tone="danger" onPress={() => { void unregister(session.id); }} disabled={busy} />
-            </View>
-          );
-        })}
-        {rowError ? <Text style={{ color: theme.colors.statusDanger, fontSize: 13 }}>{rowError}</Text> : null}
-      </Modal.Content>
-    </Modal>
-  );
-}
-
-export function MoveDialog({ theme, task, busy, onClose, onMove }: { theme: PluginTheme; task: Task | null; busy: boolean; onClose: () => void; onMove: (column: TaskColumn) => Promise<unknown> }) {
+export function MoveDialog({ theme, task, busy, onClose, onMove }: { theme: PluginTheme; task: Task | null; busy: boolean; onClose: () => void; onMove: (column: TaskColumn) => Promise<unknown>; onOpenSession?: (sessionId: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 

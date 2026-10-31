@@ -11,6 +11,8 @@ import { Choice, EmptyNote, ErrorBanner, GhostButton, StatusPill } from "./widge
 
 type Measurable = { measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void };
 
+type PointerCapturable = { setPointerCapture?: (pointerId: number) => void };
+
 function projectName(state: DeskmateState, projectId: string | undefined): string | null {
   if (!projectId) return null;
   return state.projects.find((project) => project.id === projectId)?.name ?? null;
@@ -24,7 +26,7 @@ function pointerPoint(event: { nativeEvent: { clientX?: number; clientY?: number
   };
 }
 
-function TaskCard({ theme, state, task, now, dragging, dragEnabled, ignorePress, onEdit, onMove, onOpenSession, onArm }: { theme: PluginTheme; state: DeskmateState; task: Task; now: Date; dragging: boolean; dragEnabled: boolean; ignorePress: { current: boolean }; onEdit: () => void; onMove: () => void; onOpenSession?: (sessionId: string) => void; onArm: (task: Task, x: number, y: number) => void }) {
+function TaskCard({ theme, state, task, now, dragging, dragEnabled, ignorePress, onEdit, onMove, onOpenSession, onArm }: { theme: PluginTheme; state: DeskmateState; task: Task; now: Date; dragging: boolean; dragEnabled: boolean; ignorePress: { current: boolean }; onEdit: () => void; onMove: () => void; onOpenSession?: (sessionId: string) => void; onArm: (task: Task, x: number, y: number, node: PointerCapturable, pointerId?: number) => void }) {
   const closed = task.column === "closed";
   const late = isOverdue(task, now);
   const project = projectName(state, task.projectId);
@@ -34,10 +36,7 @@ function TaskCard({ theme, state, task, now, dragging, dragEnabled, ignorePress,
       onPointerDown={(event) => {
         const point = pointerPoint(event);
         if (!dragEnabled || (point.button != null && point.button !== 0)) return;
-        const node = event.currentTarget as { setPointerCapture?: (pointerId: number) => void };
-        const pointerId = event.nativeEvent.pointerId;
-        if (pointerId != null) node.setPointerCapture?.(pointerId);
-        onArm(task, point.x, point.y);
+        onArm(task, point.x, point.y, event.currentTarget as PointerCapturable, event.nativeEvent.pointerId);
       }}
       style={{ backgroundColor: theme.colors.surface0, borderColor: dragging ? theme.colors.accent : theme.colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, gap: 6, opacity: dragging ? 0.45 : 1, cursor: "pointer" }}
     >
@@ -73,7 +72,7 @@ function TaskCard({ theme, state, task, now, dragging, dragEnabled, ignorePress,
   );
 }
 
-export function TaskBoard({ theme, layout, state, now, run, onEdit, onMove, onCreate, onRegister, onOpenSession, onDragging }: { theme: PluginTheme; layout: { compact: boolean; platform: "ios" | "android" | "web" }; state: DeskmateState; now: Date; run: (command: DeskmateMutation) => Promise<unknown>; onEdit: (taskId: string) => void; onMove: (taskId: string) => void; onCreate: () => void; onRegister: () => void; onOpenSession?: (sessionId: string) => void; onDragging?: (active: boolean) => void }) {
+export function TaskBoard({ theme, layout, state, now, run, onEdit, onMove, onCreate, onOpenSession, onDragging }: { theme: PluginTheme; layout: { compact: boolean; platform: "ios" | "android" | "web" }; state: DeskmateState; now: Date; run: (command: DeskmateMutation) => Promise<unknown>; onEdit: (taskId: string) => void; onMove: (taskId: string) => void; onCreate: () => void; onOpenSession?: (sessionId: string) => void; onDragging?: (active: boolean) => void }) {
   // Wide web shows every column, so a pointer drag can land on one. clientX matches measureInWindow. Compact keeps Move to because only one column is mounted.
   const dragEnabled = layout.platform === "web" && !layout.compact;
   const [tab, setTab] = useState<TaskColumn>("todo");
@@ -86,7 +85,7 @@ export function TaskBoard({ theme, layout, state, now, run, onEdit, onMove, onCr
   const nodeRefs = useRef<Partial<Record<TaskColumn, (node: Measurable | null) => void>>>({});
   const boardNode = useRef<Measurable | null>(null);
   const boardFrame = useRef<DragFrame | null>(null);
-  const gesture = useRef<{ taskId: string; title: string; x: number; y: number; dragging: boolean } | null>(null);
+  const gesture = useRef<{ taskId: string; title: string; x: number; y: number; dragging: boolean; node: PointerCapturable; pointerId?: number } | null>(null);
   const ignorePress = useRef(false);
   const columns = dragEnabled ? TASK_COLUMNS : [tab];
 
@@ -142,8 +141,8 @@ export function TaskBoard({ theme, layout, state, now, run, onEdit, onMove, onCr
     if (frame && active) setGhost({ left: x - frame.x, top: y - frame.y, title: active.title });
   }
 
-  function arm(task: Task, x: number, y: number) {
-    gesture.current = { taskId: task.id, title: task.title, x, y, dragging: false };
+  function arm(task: Task, x: number, y: number, node: PointerCapturable, pointerId?: number) {
+    gesture.current = { taskId: task.id, title: task.title, x, y, dragging: false, node, pointerId };
     measureBoard();
     measureAll(() => undefined);
   }
@@ -154,6 +153,8 @@ export function TaskBoard({ theme, layout, state, now, run, onEdit, onMove, onCr
     if (!active.dragging && Math.hypot(x - active.x, y - active.y) < 6) return;
     if (!active.dragging) {
       active.dragging = true;
+      // Capture only once a drag starts, so a plain click still reaches the card's press handler.
+      if (active.pointerId != null) active.node.setPointerCapture?.(active.pointerId);
       ignorePress.current = true;
       setActionError(null);
       setDraggingId(active.taskId);
@@ -196,7 +197,7 @@ export function TaskBoard({ theme, layout, state, now, run, onEdit, onMove, onCr
 
   return (
     <View ref={rememberBoard} onLayout={measureBoard} onPointerMove={(event) => { const point = pointerPoint(event); movePointer(point.x, point.y); }} onPointerUp={(event) => { const point = pointerPoint(event); endPointer(point.x, point.y); }} onPointerCancel={() => endPointer(null, null)} style={{ position: "relative", gap: 16 }}>
-      <AttentionStrip theme={theme} layout={layout} state={state} now={now} run={run} onRegister={onRegister} onOpenSession={onOpenSession} />
+      <AttentionStrip theme={theme} layout={layout} state={state} now={now} run={run} onOpenSession={onOpenSession} />
       {actionError ? <ErrorBanner theme={theme} message={actionError} /> : null}
       {dragEnabled ? null : (
         <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>

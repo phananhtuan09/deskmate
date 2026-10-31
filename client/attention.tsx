@@ -5,7 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import { attentionKey, visibleAttention, type AttentionItem, type DeskmateState } from "../shared/core";
 import type { DeskmateMutation } from "./api";
 import { errorText, sinceLabel } from "./format";
-import { EmptyNote, ErrorBanner, GhostButton, StatusPill, reasonPresentation } from "./widgets";
+import { EmptyNote, ErrorBanner, StatusPill, reasonPresentation } from "./widgets";
 
 function sessionOf(state: DeskmateState, sessionId: string) {
   return state.sessions.find((session) => session.id === sessionId);
@@ -49,7 +49,7 @@ function useDismiss(run: (command: DeskmateMutation) => Promise<unknown>) {
   return { error, dismiss };
 }
 
-export function AttentionStrip({ theme, layout, state, now, run, onRegister, onOpenSession }: { theme: PluginTheme; layout: { compact: boolean }; state: DeskmateState; now: Date; run: (command: DeskmateMutation) => Promise<unknown>; onRegister: () => void; onOpenSession?: (sessionId: string) => void }) {
+export function AttentionStrip({ theme, layout, state, now, run, onOpenSession }: { theme: PluginTheme; layout: { compact: boolean }; state: DeskmateState; now: Date; run: (command: DeskmateMutation) => Promise<unknown>; onOpenSession?: (sessionId: string) => void }) {
   const items = visibleAttention(state.attention, state.dismissed);
   const { error, dismiss } = useDismiss(run);
   return (
@@ -59,9 +59,6 @@ export function AttentionStrip({ theme, layout, state, now, run, onRegister, onO
         <Text style={{ color: theme.colors.foreground, fontSize: 13, fontWeight: "600" }}>Needs attention</Text>
         <View style={{ minWidth: 18, borderRadius: 10, paddingHorizontal: 7, backgroundColor: theme.colors.surface2, alignItems: "center" }}>
           <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12, fontVariant: ["tabular-nums"] }}>{items.length}</Text>
-        </View>
-        <View style={{ marginLeft: "auto" }}>
-          <GhostButton theme={theme} label="Register session" icon="Plus" onPress={onRegister} />
         </View>
       </View>
       {error ? <ErrorBanner theme={theme} message={error} /> : null}
@@ -78,54 +75,16 @@ export function AttentionStrip({ theme, layout, state, now, run, onRegister, onO
   );
 }
 
-function SessionRow({ theme, name, meta, waiting, onOpen, onUnregister }: { theme: PluginTheme; name: string; meta: string; waiting: number; onOpen?: () => void; onUnregister: () => void }) {
-  const [focused, setFocused] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderWidth: focused ? 2 : 1, borderColor: focused ? theme.colors.accent : theme.colors.border, borderRadius: 8, padding: 12, backgroundColor: hovered && onOpen ? theme.colors.surface2 : theme.colors.surface1 }}>
-      <Pressable accessibilityRole={onOpen ? "button" : undefined} accessibilityLabel={onOpen ? `Open ${name}` : undefined} disabled={!onOpen} onPress={onOpen} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} style={{ flex: 1, gap: 4, cursor: onOpen ? "pointer" : "auto" }}>
-        <Text style={{ color: theme.colors.foreground, fontSize: 14, fontWeight: "600" }}>{name}</Text>
-        <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>{meta}</Text>
-        {waiting > 0 ? <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>{waiting} waiting</Text> : null}
-      </Pressable>
-      <GhostButton theme={theme} label="Unregister" tone="danger" onPress={onUnregister} />
-    </View>
-  );
-}
-
-export function AttentionView({ theme, state, now, run, onRegister, onOpenSession }: { theme: PluginTheme; state: DeskmateState; now: Date; run: (command: DeskmateMutation) => Promise<unknown>; onRegister: () => void; onOpenSession?: (sessionId: string) => void }) {
+export function AttentionView({ theme, state, now, run, onOpenSession }: { theme: PluginTheme; state: DeskmateState; now: Date; run: (command: DeskmateMutation) => Promise<unknown>; onOpenSession?: (sessionId: string) => void }) {
   const items = visibleAttention(state.attention, state.dismissed);
   const { error, dismiss } = useDismiss(run);
-  const [rowError, setRowError] = useState<string | null>(null);
-
-  async function unregister(sessionId: string) {
-    setRowError(null);
-    try {
-      await run({ type: "unregisterSession", sessionId });
-    } catch (caught) {
-      setRowError(errorText(caught));
-    }
-  }
-
   return (
     <View style={{ gap: 16 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Text style={{ flex: 1, color: theme.colors.foreground, fontSize: 16, fontWeight: "600" }}>Needs attention</Text>
-        <GhostButton theme={theme} label="Register session" icon="Plus" onPress={onRegister} />
-      </View>
+      <Text style={{ color: theme.colors.foreground, fontSize: 16, fontWeight: "600" }}>Needs attention</Text>
       {error ? <ErrorBanner theme={theme} message={error} /> : null}
       {items.length === 0 ? <EmptyNote theme={theme} message="Nothing needs you right now." /> : items.map((item) => (
         <AttentionCard key={attentionKey(item)} theme={theme} state={state} item={item} now={now} onOpen={onOpenSession} onDismiss={() => { void dismiss(item); }} />
       ))}
-      <Text style={{ color: theme.colors.foreground, fontSize: 16, fontWeight: "600" }}>Registered sessions</Text>
-      {rowError ? <ErrorBanner theme={theme} message={rowError} /> : null}
-      {state.sessions.length === 0 ? <EmptyNote theme={theme} message="No sessions registered. Paste an agent id, or run /deskmate in that agent's chat." /> : state.sessions.map((session) => {
-        const waiting = items.filter((item) => item.sessionId === session.id).length;
-        const name = session.label || session.id;
-        return (
-          <SessionRow key={session.id} theme={theme} name={name} meta={[session.provider, session.workspace].filter(Boolean).join(" · ") || session.id} waiting={waiting} onOpen={onOpenSession ? () => onOpenSession(session.id) : undefined} onUnregister={() => { void unregister(session.id); }} />
-        );
-      })}
     </View>
   );
 }

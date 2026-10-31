@@ -53,14 +53,15 @@ Do not restart the daemon to pick up source changes.
 Deskmate watches only sessions you register.
 Open **Deskmate** from the Paseo sidebar.
 
-In the agent you want to watch, submit `/deskmate` in the composer.
-That command registers the current agent and does not send the text to the agent.
+In the agent you want to watch, click the **Deskmate** pill above the composer.
+The pill shows whether that agent is registered, and clicking it again unregisters the agent.
+Submitting `/deskmate` in the composer also registers the current agent and does not send the text to the agent.
 
-You can also choose **Register session** in Deskmate and paste that agent's id.
+You can also open the **Sessions** tab in Deskmate and paste that agent's id.
 **Unregister** stops observation.
 Tasks that were linked to the session stay as they are.
 
-Choose an attention item, or a row in **Registered sessions**, to open that agent.
+Choose an attention item, or a row in the **Sessions** tab, to open that agent.
 Dismiss hides one current reminder.
 The reminder returns only when a new cause appears.
 

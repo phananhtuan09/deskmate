@@ -1,6 +1,7 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { DeskmateHome, DeskmateSidebarItem } from "./client/home";
 import { DeskmateSettings } from "./client/settings";
+import { contributeComposerPills } from "./client/pills";
 import { deskmateCommand } from "./shared/contract";
 
 export default function contribute(client: PluginClientContext) {
@@ -21,7 +22,9 @@ export default function contribute(client: PluginClientContext) {
       },
     }),
   ];
+  const removePills = contributeComposerPills(client);
   return () => {
+    removePills();
     for (const remove of removers) remove();
   };
 }

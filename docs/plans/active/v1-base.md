@@ -14,6 +14,10 @@ Ship version 1 of the [task board](../../product/task-board.md), [Projects](../.
 - Startup refresh runs on the first handler that receives the daemon API, because plugin startup has no daemon client.
 - Done: Board, Projects, and Attention on one screen, pasted-id registration, the `/deskmate` command, the sidebar count, and toasts.
 - Done: Projects has a Sync action that adds or updates the projects Paseo already lists, without deleting local projects or editing tasks.
+- Done: a normally finished turn no longer creates an attention item, and stored `waiting_for_user` entries are dropped on load.
+- Done: clicking a card opens the editor again; pointer capture now starts only when a drag begins.
+- Done: the task form links sessions as a list with name, project, open, and remove.
+- Done: Sessions is its own tab with the paste-id form and the registered list, and a Deskmate pill in each agent composer shows and toggles registration.
 - Done: the local plugin reloads to `running`.
 - Next: exercise the screens inside Paseo and capture light, dark, desktop, and compact screenshots.
 
@@ -28,7 +32,7 @@ Ship version 1 of the [task board](../../product/task-board.md), [Projects](../.
 ## Validation
 
 - `npm run typecheck` passed after the UI and the move into `shared/core/`.
-- `npm test` passed, 19 tests, covering overdue boundaries, attention, dismiss, the atomic file store, and column hit testing.
+- `npm test` passed, 21 tests, covering overdue boundaries, attention, dismiss, the atomic file store, and column hit testing.
 - `paseo plugin ls` shows `deskmate` as `running` after `paseo plugin reload deskmate`.
 - The plugin log records `Plugin ready`.
 - Creating a task, dragging it, registering a session, receiving a permission or turn event, dismissing a reminder, and taking theme screenshots were not done in this session.

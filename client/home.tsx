@@ -8,22 +8,23 @@ import { AttentionView } from "./attention";
 import { useDeskmate } from "./api";
 import { TaskBoard } from "./board";
 import { errorText } from "./format";
-import { MoveDialog, ProjectDialog, RegisterDialog, TaskDialog } from "./forms";
+import { MoveDialog, ProjectDialog, TaskDialog } from "./forms";
+import { SessionsView } from "./sessions";
 import { ProjectsView } from "./projects";
 import { ReminderToasts } from "./toasts";
 import { CountBadge, ErrorBanner, PrimaryButton, Segment } from "./widgets";
 
-type ScreenView = "board" | "attention" | "projects";
+type ScreenView = "board" | "attention" | "sessions" | "projects";
 
 type Dialog =
   | { type: "task"; taskId: string | null }
   | { type: "project"; projectId: string | null }
-  | { type: "register" }
   | { type: "move"; taskId: string };
 
 const VIEWS: readonly { id: ScreenView; label: string }[] = [
   { id: "board", label: "Board" },
   { id: "attention", label: "Attention" },
+  { id: "sessions", label: "Sessions" },
   { id: "projects", label: "Projects" },
 ];
 
@@ -63,8 +64,9 @@ export function DeskmateHome({ theme, layout, host, navigation }: PluginScreenPr
           {!layout.compact && view === "board" ? <PrimaryButton theme={theme} label="New task" icon="Plus" onPress={() => setDialog({ type: "task", taskId: null })} /> : null}
         </View>
         {desk.error ? <ErrorBanner theme={theme} message={errorText(desk.error)} onRetry={() => { void desk.refetch(); }} /> : null}
-        {view === "board" ? <TaskBoard theme={theme} layout={layout} state={state} now={desk.now} run={desk.run} onEdit={(taskId) => setDialog({ type: "task", taskId })} onMove={(taskId) => setDialog({ type: "move", taskId })} onCreate={() => setDialog({ type: "task", taskId: null })} onRegister={() => setDialog({ type: "register" })} onOpenSession={openSession} onDragging={setDragging} /> : null}
-        {view === "attention" ? <AttentionView theme={theme} state={state} now={desk.now} run={desk.run} onRegister={() => setDialog({ type: "register" })} onOpenSession={openSession} /> : null}
+        {view === "board" ? <TaskBoard theme={theme} layout={layout} state={state} now={desk.now} run={desk.run} onEdit={(taskId) => setDialog({ type: "task", taskId })} onMove={(taskId) => setDialog({ type: "move", taskId })} onCreate={() => setDialog({ type: "task", taskId: null })} onOpenSession={openSession} onDragging={setDragging} /> : null}
+        {view === "attention" ? <AttentionView theme={theme} state={state} now={desk.now} run={desk.run} onOpenSession={openSession} /> : null}
+        {view === "sessions" ? <SessionsView theme={theme} state={state} busy={desk.busy} run={desk.run} onOpenSession={openSession} /> : null}
         {view === "projects" ? <ProjectsView theme={theme} state={state} run={desk.run} onCreate={() => setDialog({ type: "project", projectId: null })} onEdit={(projectId) => setDialog({ type: "project", projectId })} /> : null}
       </ScrollView>
       {layout.compact && view === "board" ? (
@@ -72,9 +74,8 @@ export function DeskmateHome({ theme, layout, host, navigation }: PluginScreenPr
           <Icon name="Plus" size={20} color={theme.colors.accentForeground} />
         </Pressable>
       ) : null}
-      {dialog?.type === "task" ? <TaskDialog theme={theme} state={state} now={desk.now} mode={dialog.taskId ? "edit" : "create"} task={task} busy={desk.busy} onClose={() => setDialog(null)} onSubmit={desk.run} onMove={(column: TaskColumn) => desk.run({ type: "moveTask", taskId: dialog.taskId ?? "", column })} /> : null}
+      {dialog?.type === "task" ? <TaskDialog theme={theme} state={state} now={desk.now} mode={dialog.taskId ? "edit" : "create"} task={task} busy={desk.busy} onClose={() => setDialog(null)} onSubmit={desk.run} onMove={(column: TaskColumn) => desk.run({ type: "moveTask", taskId: dialog.taskId ?? "", column })} onOpenSession={openSession} /> : null}
       {dialog?.type === "project" ? <ProjectDialog theme={theme} state={state} mode={dialog.projectId ? "edit" : "create"} project={project} busy={desk.busy} onClose={() => setDialog(null)} onSubmit={desk.run} /> : null}
-      {dialog?.type === "register" ? <RegisterDialog theme={theme} state={state} busy={desk.busy} onClose={() => setDialog(null)} onSubmit={(sessionId) => desk.run({ type: "registerSession", sessionId })} onUnregister={(sessionId) => desk.run({ type: "unregisterSession", sessionId })} onOpenSession={openSession} /> : null}
       {dialog?.type === "move" && dialog.taskId ? <MoveDialog theme={theme} task={moving} busy={desk.busy} onClose={() => setDialog(null)} onMove={(column) => desk.run({ type: "moveTask", taskId: dialog.taskId, column })} /> : null}
       <ReminderToasts hostId={host.id} state={state} now={desk.now} />
     </View>
